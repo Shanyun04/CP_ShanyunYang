@@ -1,0 +1,234 @@
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+class IsingSpin:
+    def __init__(self):
+        self.sz = 1
+
+    def _sz(self):
+        return self.sz
+
+    def set_up(self):
+        self.sz = 1
+
+    def set_dw(self):
+        self.sz = -1
+
+    def set_sz(self, sz_spec):
+        assert sz_spec == 1 or sz_spec == -1
+        self.sz = sz_spec
+
+    def flip(self):
+        self.sz *= -1
+
+
+class IsingSystem:
+    def __init__(self, n_spins_spec):
+        self.J = -1.0
+        self.n_spins = n_spins_spec
+        self.maxrep_state = int(math.pow(2, n_spins_spec) - 1)
+        self.spin = [IsingSpin() for _ in range(n_spins_spec)]
+
+    def _J(self):
+        return self.J
+
+    def _n_spins(self):
+        return self.n_spins
+
+    def _maxrep_state(self):
+        return self.maxrep_state
+
+    def _sz(self, site_idx):
+        return self.spin[site_idx]._sz()
+
+    def set_up_spin(self, site_idx):
+        self.spin[site_idx].set_up()
+
+    def set_dw_spin(self, site_idx):
+        self.spin[site_idx].set_dw()
+
+    def set_spin(self, site_idx, s_spec):
+        self.spin[site_idx].set_sz(s_spec)
+
+    def flip_spin(self, site_idx):
+        self.spin[site_idx].flip()
+
+    def set_state_by_code(self, rep_state):
+        i = self.n_spins
+        while rep_state != 0:
+            if rep_state % 2 == 1:
+                self.set_up_spin(i - 1)
+            else:
+                self.set_dw_spin(i - 1)
+            i -= 1
+            rep_state = rep_state // 2
+
+    def eval_mz(self):
+        mz = 0
+        for i in range(self.n_spins):
+            mz += self.spin[i]._sz()
+        return mz
+
+    def eval_energy_1D(self):
+        eval_energy_1D = 0
+        for i in range(1, self.n_spins):
+            eval_energy_1D += self.spin[i - 1]._sz() * self.spin[i]._sz()
+        eval_energy_1D += self.spin[self.n_spins - 1]._sz() * self.spin[0]._sz()
+        eval_energy_1D *= self.J
+        return eval_energy_1D
+
+
+class IsingSystemSquare(IsingSystem):
+    def __init__(self, system_size_spec):
+        super().__init__(system_size_spec[0] * system_size_spec[1])
+        self.system_size = system_size_spec
+
+    def site_index(self, lattice_coordinate):
+        site_index = lattice_coordinate[1] * self.system_size[0] + lattice_coordinate[0]
+        return site_index
+
+    def lattice_coordinate(self, site_index):
+        x = site_index % self.system_size[0]
+        y = site_index // self.system_size[0]
+        return [x, y]
+
+    def shift_pos_x(self, r_spec):
+        r = r_spec.copy()
+        r[0] = (r[0] + 1) % self.system_size[0]
+        return r
+
+    def shift_neg_x(self, r_spec):
+        r = r_spec.copy()
+        r[0] = (r[0] - 1) % self.system_size[0]
+        return r
+
+    def shift_pos_y(self, r_spec):
+        r = r_spec.copy()
+        r[1] = (r[1] + 1) % self.system_size[1]
+        return r
+
+    def shift_neg_y(self, r_spec):
+        r = r_spec.copy()
+        r[1] = (r[1] - 1) % self.system_size[1]
+        return r
+
+    def NN(self, site_idx, bond_idx):
+        r = self.lattice_coordinate(site_idx)
+        if bond_idx == 0:
+            return self.site_index(self.shift_pos_x(r))
+        elif bond_idx == 1:
+            return self.site_index(self.shift_pos_y(r))
+        elif bond_idx == 2:
+            return self.site_index(self.shift_neg_x(r))
+        elif bond_idx == 3:
+            return self.site_index(self.shift_neg_y(r))
+        else:
+            return -1
+
+    def square_mz(self):
+        mz = 0
+        for i in range(self.system_size[0] * self.system_size[1]):
+            mz += self.spin[i]._sz()
+        return mz
+
+    def square_energy(self):
+        energy = 0
+        for i in range(self.system_size[0] * self.system_size[1]):
+            for j in range(4):
+                site1 = self.NN(i, j)
+                energy += self.spin[i]._sz() * self.spin[site1]._sz()
+        energy *= self.J / 2
+        return energy
+
+    def Partition(self, beta):
+        Z = 0
+        for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
+            energy = self.square_energy()
+            Z += math.exp(-beta * energy)
+        return Z
+
+    def average_M(self, Z, beta):
+        average_M = 0
+        for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
+            energy = self.square_energy()
+            average_M += math.exp(-beta * energy) * self.square_mz()
+        average_M = average_M / Z
+        return average_M
+    
+    def average_E(self, Z, beta):
+        average_E = 0
+        for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
+            energy = self.square_energy()
+            average_E += math.exp(-beta * energy) * self.square_energy()
+        average_E = average_E / Z
+        return average_E
+    
+    def average_M2(self, Z, beta):
+        average_M2 = 0
+        for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
+            energy = self.square_energy()
+            average_M2 += math.exp(-beta * energy) * math.pow(self.square_mz(), 2)
+        average_M2 = average_M2 / Z
+        return average_M2
+    
+    def average_E2(self, Z, beta):
+        average_E2 = 0
+        for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
+            energy = self.square_energy()
+            average_E2 += math.exp(-beta * energy) * math.pow(self.square_energy(), 2)
+        average_E2 = average_E2 / Z
+        return average_E2
+
+#set J = 1.0 in this project.
+
+data = np.zeros((3, 80))
+
+#set different length in the lattice
+for L in range(2,6):
+    i =0
+    
+    #set different temperature in the lattice and let k_B = 1
+    for T in np.linspace(0.05,4,80):
+        system_size_spec = [L, L]
+        beta = 1 / T
+
+        square_spin = IsingSystemSquare(system_size_spec)
+        Z = square_spin.Partition(beta)
+
+        average_E = square_spin.average_E(Z, beta)
+        average_M2 = square_spin.average_M2(Z, beta)
+        average_E2 = square_spin.average_E2(Z, beta)
+    
+        mz2_per_spin = average_M2 / L ** 4
+        E_per_spin = average_E / L ** 2
+        spheat_per_spin = (average_E2 - average_E ** 2) / (T ** 2 * L ** 2)
+    
+        data[0,i] = mz2_per_spin
+        data[1,i] = E_per_spin
+        data[2,i] = spheat_per_spin
+        i +=1
+        
+    plt.figure(1)
+    plt.plot(np.linspace(0.05,4,80),data[0,:],label="L = %d" % (L))
+    plt.xlabel("T / J")
+    plt.ylabel("< M^2 > / N^2")
+    plt.legend(loc='best')
+    
+    plt.figure(2)
+    plt.plot(np.linspace(0.05,4,80),data[1,:],label="L = %d" % (L))
+    plt.xlabel("T / J")
+    plt.ylabel("energy per spin < H > / N")
+    plt.legend(loc='best')
+    
+    plt.figure(3)
+    plt.plot(np.linspace(0.05,4,80),data[2,:],label="L = %d" % (L))
+    plt.xlabel("T / J")
+    plt.ylabel("specific heat per spin C / N")
+    plt.legend(loc='best')
