@@ -2,4 +2,4 @@
 
 Week5：L = 5 计算量有点大，debug了很久到了很晚来不及跑，L = 5 的图后期再补上，主要是拿Python写的，在Ising_py文件里
 
-![image]()
+![image](https://github.com/Shanyun04/CP_ShanyunYang/blob/main/M%5E2%20per%20spin%5E2.png?raw=true)
