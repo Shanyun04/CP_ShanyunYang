@@ -146,8 +146,8 @@ class IsingSystemSquare(IsingSystem):
     def Partition(self, beta):
         Z = np.zeros(len(beta))
         for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
             for j in range((len(beta))):
-                self.set_state_by_code(i)
                 energy= self.square_energy()
                 Z[j] += math.exp(-beta[j] * energy)
         return Z
@@ -155,8 +155,8 @@ class IsingSystemSquare(IsingSystem):
     def average_M(self, Z, beta):
         average_M = np.zeros((1,len(beta)))
         for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
             for j in range(len(beta)):
-                self.set_state_by_code(i)
                 energy = self.square_energy()
                 average_M[j] += math.exp(-beta[j] * energy) * self.square_mz()
         average_M = average_M / Z
@@ -165,8 +165,8 @@ class IsingSystemSquare(IsingSystem):
     def average_E(self, Z, beta):
         average_E = np.zeros(len(beta))
         for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
             for j in range(len(beta)):
-                self.set_state_by_code(i)
                 energy = self.square_energy()
                 average_E[j] += math.exp(-beta[j] * energy) * self.square_energy()
         average_E = average_E / Z
@@ -175,8 +175,8 @@ class IsingSystemSquare(IsingSystem):
     def average_M2(self, Z, beta):
         average_M2 = np.zeros(len(beta))
         for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
             for j in range(len(beta)):
-                self.set_state_by_code(i)
                 energy = self.square_energy()
                 average_M2[j] += math.exp(-beta[j] * energy) * math.pow(self.square_mz(), 2)
         average_M2 = average_M2 / Z
@@ -185,12 +185,29 @@ class IsingSystemSquare(IsingSystem):
     def average_E2(self, Z, beta):
         average_E2 = np.zeros(len(beta))
         for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
             for j in range(len(beta)):
-                self.set_state_by_code(i)
                 energy = self.square_energy()
                 average_E2[j] += math.exp(-beta[j] * energy) * math.pow(self.square_energy(), 2)
         average_E2 = average_E2 / Z
         return average_E2
+    
+    #上面的要重复算太多次了，这里重新写一个
+    
+    def average(self, beta):
+        average = np.zeros((5,len(beta)))
+        for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
+            self.set_state_by_code(i)
+            for j in range(len(beta)):
+                energy = self.square_energy()
+                average[0][j] += math.exp(-beta[j] * energy)
+                average[1][j] += math.exp(-beta[j] * energy) * self.square_mz()
+                average[2][j] += math.exp(-beta[j] * energy) * self.square_energy()
+                average[3][j] += math.exp(-beta[j] * energy) * math.pow(self.square_mz(), 2)
+                average[4][j] += math.exp(-beta[j] * energy) * math.pow(self.square_energy(), 2)
+        average = average / average[0][:]
+        return average
+
 
 #set J = 1.0 in this project.
 #set different length in the lattice
@@ -205,33 +222,23 @@ for L in range(2,5):
 
     square_spin = IsingSystemSquare(system_size_spec)
     
-    Z = square_spin.Partition(beta)
-    average_E = square_spin.average_E(Z, beta)
-    average_M2 = square_spin.average_M2(Z, beta)
-    average_E2 = square_spin.average_E2(Z, beta)
-    
-    mz2_per_spin = average_M2 / L ** 4
-    E_per_spin = average_E / L ** 2
-    spheat_per_spin = (average_E2 - average_E ** 2) / (T ** 2 * L ** 2)
+    ave = square_spin.average(beta)
         
     plt.figure(1)
-    plt.plot(np.linspace(0.05,4,80),mz2_per_spin,label="L = %d" % (L))
+    plt.plot(T,ave[3][:] / L ** 4,label="L = %d" % (L))
     plt.xlabel("T / J")
     plt.ylabel("< M^2 > / N^2")
     plt.legend(loc='best')
     
     plt.figure(2)
-    plt.plot(np.linspace(0.05,4,80),E_per_spin,label="L = %d" % (L))
+    plt.plot(T,ave[2][:] / L ** 2,label="L = %d" % (L))
     plt.xlabel("T / J")
     plt.ylabel("energy per spin < H > / N")
     plt.legend(loc='best')
     
     plt.figure(3)
-    plt.plot(np.linspace(0.05,4,80),spheat_per_spin,label="L = %d" % (L))
+    plt.plot(T,(ave[4][:] - ave[2][:] ** 2) * beta **2 / L ** 2,label="L = %d" % (L))
     plt.xlabel("T / J")
     plt.ylabel("specific heat per spin C / N")
     plt.legend(loc='best')
-    
-end_time = time.time()
-print("耗时: {:.2f}秒".format(end_time - start_time))
     
