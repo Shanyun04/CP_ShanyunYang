@@ -1,0 +1,307 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+
+class IsingSpin {
+private:
+    int sz;
+
+public:
+    IsingSpin() : sz(1) {}
+
+    int _sz() {
+        return sz;
+    }
+
+    void set_up() {
+        sz = 1;
+    }
+
+    void set_dw() {
+        sz = -1;
+    }
+
+    void set_sz(int sz_spec) {
+        if (sz_spec == 1 || sz_spec == -1) {
+            sz = sz_spec;
+        }
+    }
+
+    void flip() {
+        sz *= -1;
+    }
+};
+
+class IsingSystem {
+private:
+    double J;
+    int n_spins;
+    int maxrep_state;
+    std::vector<IsingSpin> spin;
+
+public:
+    IsingSystem(int n_spins_spec) : J(-1.0), n_spins(n_spins_spec), maxrep_state(pow(2, n_spins_spec) - 1), spin(n_spins_spec, IsingSpin()) {}
+
+    double _J() {
+        return J;
+    }
+
+    int _n_spins() {
+        return n_spins;
+    }
+
+    int _maxrep_state() {
+        return maxrep_state;
+    }
+
+    int _sz(int site_idx) {
+        return spin[site_idx]._sz();
+    }
+
+    void set_up_spin(int site_idx) {
+        spin[site_idx].set_up();
+    }
+
+    void set_dw_spin(int site_idx) {
+        spin[site_idx].set_dw();
+    }
+
+    void set_spin(int site_idx, int s_spec) {
+        spin[site_idx].set_sz(s_spec);
+    }
+
+    void flip_spin(int site_idx) {
+        spin[site_idx].flip();
+    }
+
+    void set_state_by_code(int rep_state) {
+        int i = n_spins;
+        while (rep_state != 0) {
+            if (rep_state % 2 == 1) {
+                set_up_spin(i - 1);
+            }
+            else {
+                set_dw_spin(i - 1);
+            }
+            i--;
+            rep_state = rep_state / 2;
+        }
+    }
+
+    int eval_mz() {
+        int mz = 0;
+        for (int i = 0; i < n_spins; i++) {
+            mz += spin[i]._sz();
+        }
+        return mz;
+    }
+
+    double eval_energy_1D() {
+        double eval_energy_1D = 0;
+        for (int i = 1; i < n_spins; i++) {
+            eval_energy_1D += spin[i - 1]._sz() * spin[i]._sz();
+        }
+        eval_energy_1D += spin[n_spins - 1]._sz() * spin[0]._sz();
+        eval_energy_1D *= J;
+        return eval_energy_1D;
+    }
+};
+
+class IsingSystemSquare : public IsingSystem {
+private:
+    std::vector<int> system_size;
+
+public:
+    IsingSystemSquare(std::vector<int> system_size_spec) : IsingSystem(system_size_spec[0] * system_size_spec[1]), system_size(system_size_spec) {}
+
+    int site_index(std::vector<int> lattice_coordinate) {
+        return lattice_coordinate[1] * system_size[0] + lattice_coordinate[0];
+    }
+
+    std::vector<int> lattice_coordinate(int site_index) {
+        int x = site_index % system_size[0];
+        int y = site_index / system_size[0];
+        return { x, y };
+    }
+
+    std::vector<int> shift_pos_x(std::vector<int> r_spec) {
+        std::vector<int> r = r_spec;
+        r[0] = (r[0] + 1) % system_size[0];
+        return r;
+    }
+
+    std::vector<int> shift_neg_x(std::vector<int> r_spec) {
+        std::vector<int> r = r_spec;
+        r[0] = (r[0] - 1 + system_size[0]) % system_size[0];
+        return r;
+    }
+
+    std::vector<int> shift_pos_y(std::vector<int> r_spec) {
+        std::vector<int> r = r_spec;
+        r[1] = (r[1] + 1) % system_size[1];
+        return r;
+    }
+
+    std::vector<int> shift_neg_y(std::vector<int> r_spec) {
+        std::vector<int> r = r_spec;
+        r[1] = (r[1] - 1 + system_size[1]) % system_size[1];
+        return r;
+    }
+
+    int NN(int site_idx, int bond_idx) {
+        std::vector<int> r = lattice_coordinate(site_idx);
+        if (bond_idx == 0) {
+            return site_index(shift_pos_x(r));
+        }
+        else if (bond_idx == 1) {
+            return site_index(shift_pos_y(r));
+        }
+        else if (bond_idx == 2) {
+            return site_index(shift_neg_x(r));
+        }
+        else if (bond_idx == 3) {
+            return site_index(shift_neg_y(r));
+        }
+        else {
+            return -1;
+        }
+    }
+
+    int square_mz() {
+        int mz = 0;
+        for (int i = 0; i < system_size[0] * system_size[1]; i++) {
+            mz += _sz(i);
+        }
+        return mz;
+    }
+
+    double square_energy() {
+        double energy = 0;
+        for (int i = 0; i < system_size[0] * system_size[1]; i++) {
+            for (int j = 0; j < 4; j++) {
+                int site1 = NN(i, j);
+                energy += _sz(i) * _sz(site1);
+            }
+        }
+        energy *= _J() / 2;
+        return energy;
+    }
+
+    std::vector<double> Partition(std::vector<double> beta) {
+        std::vector<double> Z(beta.size(), 0);
+        for (int i = 0; i < pow(2, system_size[0] * system_size[1]) - 1; i++) {
+            for (int j = 0; j < beta.size(); j++) {
+                set_state_by_code(i);
+                double energy = square_energy();
+                Z[j] += exp(-beta[j] * energy);
+            }
+        }
+        return Z;
+    }
+
+    std::vector<double> average_M(std::vector<double> Z, std::vector<double> beta) {
+        std::vector<double> average_M(beta.size(), 0);
+        for (int i = 0; i < pow(2, system_size[0] * system_size[1]) - 1; i++) {
+            for (int j = 0; j < beta.size(); j++) {
+                set_state_by_code(i);
+                double energy = square_energy();
+                average_M[j] += exp(-beta[j] * energy) * square_mz();
+            }
+        }
+        for (int j = 0; j < beta.size(); j++) {
+            average_M[j] /= Z[j];
+        }
+        return average_M;
+    }
+
+    std::vector<double> average_E(std::vector<double> Z, std::vector<double> beta) {
+        std::vector<double> average_E(beta.size(), 0);
+        for (int i = 0; i < pow(2, system_size[0] * system_size[1]) - 1; i++) {
+            for (int j = 0; j < beta.size(); j++) {
+                set_state_by_code(i);
+                double energy = square_energy();
+                average_E[j] += exp(-beta[j] * energy) * energy;
+            }
+        }
+        for (int j = 0; j < beta.size(); j++) {
+            average_E[j] /= Z[j];
+        }
+        return average_E;
+    }
+
+    std::vector<double> average_M2(std::vector<double> Z, std::vector<double> beta) {
+        std::vector<double> average_M2(beta.size(), 0);
+        for (int i = 0; i < pow(2, system_size[0] * system_size[1]) - 1; i++) {
+            for (int j = 0; j < beta.size(); j++) {
+                set_state_by_code(i);
+                double energy = square_energy();
+                average_M2[j] += exp(-beta[j] * energy) * pow(square_mz(), 2);
+            }
+        }
+        for (int j = 0; j < beta.size(); j++) {
+            average_M2[j] /= Z[j];
+        }
+        return average_M2;
+    }
+
+    std::vector<double> average_E2(std::vector<double> Z, std::vector<double> beta) {
+        std::vector<double> average_E2(beta.size(), 0);
+        for (int i = 0; i < pow(2, system_size[0] * system_size[1]) - 1; i++) {
+            for (int j = 0; j < beta.size(); j++) {
+                set_state_by_code(i);
+                double energy = square_energy();
+                average_E2[j] += exp(-beta[j] * energy) * pow(energy, 2);
+            }
+        }
+        for (int j = 0; j < beta.size(); j++) {
+            average_E2[j] /= Z[j];
+        }
+        return average_E2;
+    }
+};
+
+int main() {
+    double start_time = clock();
+
+    for (int L = 2; L < 4; L++) {
+        std::vector<double> T;
+        for (int i = 0; i < 80; i++) {
+            T.push_back(0.05 + i * (4 - 0.05) / 79);
+        }
+        std::vector<int> system_size_spec = { L, L };
+        std::vector<double> beta;
+        for (int i = 0; i < 80; i++) {
+            beta.push_back(1 / T[i]);
+        }
+
+        IsingSystemSquare square_spin(system_size_spec);
+
+        std::vector<double> Z = square_spin.Partition(beta);
+        std::vector<double> average_E = square_spin.average_E(Z, beta);
+        std::vector<double> average_M2 = square_spin.average_M2(Z, beta);
+        std::vector<double> average_E2 = square_spin.average_E2(Z, beta);
+
+        std::vector<double> mz2_per_spin;
+        for (int i = 0; i < 80; i++) {
+            mz2_per_spin.push_back(average_M2[i] / pow(L, 4));
+        }
+
+        std::vector<double> E_per_spin;
+        for (int i = 0; i < 80; i++) {
+            E_per_spin.push_back(average_E[i] / pow(L, 2));
+        }
+
+        std::vector<double> spheat_per_spin;
+        for (int i = 0; i < 80; i++) {
+            spheat_per_spin.push_back((average_E2[i] - pow(average_E[i], 2)) / (pow(T[i], 2) * pow(L, 2)));
+        }
+
+        // 之后写导入txt文件的code
+
+    }
+
+    double end_time = clock();
+    std::cout << "Time taken: " << (end_time - start_time) / CLOCKS_PER_SEC << " seconds" << std::endl;
+
+    return 0;
+}
