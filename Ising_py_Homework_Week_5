@@ -198,13 +198,14 @@ class IsingSystemSquare(IsingSystem):
         average = np.zeros((5,len(beta)))
         for i in np.arange(math.pow(2, self.system_size[0] * self.system_size[1]) - 1):
             self.set_state_by_code(i)
+            energy = self.square_energy()
+            m = self.square_mz()
             for j in range(len(beta)):
-                energy = self.square_energy()
                 average[0][j] += math.exp(-beta[j] * energy)
-                average[1][j] += math.exp(-beta[j] * energy) * self.square_mz()
-                average[2][j] += math.exp(-beta[j] * energy) * self.square_energy()
-                average[3][j] += math.exp(-beta[j] * energy) * math.pow(self.square_mz(), 2)
-                average[4][j] += math.exp(-beta[j] * energy) * math.pow(self.square_energy(), 2)
+                average[1][j] += math.exp(-beta[j] * energy) * m
+                average[2][j] += math.exp(-beta[j] * energy) * energy
+                average[3][j] += math.exp(-beta[j] * energy) * m ** 2
+                average[4][j] += math.exp(-beta[j] * energy) * energy ** 2
         average = average / average[0][:]
         return average
 
