@@ -214,7 +214,7 @@ class IsingSystemSquare(IsingSystem):
 #set different length in the lattice
 start_time = time.time()
 
-for L in range(2,5):
+for L in range(2,6):
     
     #set different temperature in the lattice and let k_B = 1
     T = np.linspace(0.05,4,80)
